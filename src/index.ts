@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import passport from "passport";
 import { PassportConfig } from "./auth/passportConfig";
 import { setupSecurityMiddleware } from "./middlewares/securityMiddleware";
@@ -9,6 +10,7 @@ import { AuthService } from "./services/AuthService";
 import { MongoDBStorageAdapter } from "./utils/MongoDBStorageAdapter";
 import { EmailService } from "./services/EmailService";
 import { setupSwagger } from "./utils/swagger";
+import { setupMorganLogger } from "./utils/morganLogger";
 import config from "./config/config";
 import { logInfo, logError } from "./utils/logger";
 import fs from "fs";
@@ -23,10 +25,19 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
+// Setup Morgan logger for HTTP request logging
+setupMorganLogger(app);
+
 // Middleware setup
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173", // Default to Vite development server
+    credentials: true, // Allow cookies to be sent with requests
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // Parse cookies
 
 // Setup security middleware (helmet, xss protection, etc.)
 setupSecurityMiddleware(app);
@@ -57,7 +68,11 @@ const authService = new AuthService(
 // Setup Passport for OAuth authentication
 app.use(passport.initialize());
 // Initialize Passport config
-const passportConfig = new PassportConfig(authService, storageAdapter, config.auth);
+const passportConfig = new PassportConfig(
+  authService,
+  storageAdapter,
+  config.auth
+);
 passportConfig.initialize();
 
 // Initialize Auth controller
@@ -84,7 +99,9 @@ app.use((req, res) => {
 
 // Start the server
 app.listen(config.port, () => {
-  logInfo(`Server running on port ${config.port} in ${config.environment} mode`);
+  logInfo(
+    `Server running on port ${config.port} in ${config.environment} mode`
+  );
   logInfo(
     `API Documentation available at http://localhost:${config.port}/api-docs`
   );
