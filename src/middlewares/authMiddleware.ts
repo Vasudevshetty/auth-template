@@ -18,13 +18,21 @@ declare global {
 export const authenticateJwt = (authService: AuthService) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Get token from authorization header
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        throw new UnauthorizedError("No token provided");
+      // Get token from cookie or Authorization header
+      let token = req.cookies?.accessToken;
+
+      // If no cookie, check for Authorization header as fallback
+      if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+          token = authHeader.split(" ")[1];
+        }
       }
 
-      const token = authHeader.split(" ")[1];
+      // Check if token exists
+      if (!token) {
+        throw new UnauthorizedError("No token provided");
+      }
 
       // Validate token
       const payload = authService.validateToken(token);
